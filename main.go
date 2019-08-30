@@ -1,39 +1,123 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
+
+	_ "github.com/lib/pq"
 )
+
+var db *sql.DB
+
+type Users struct {
+	email    string
+	password string
+}
 
 func main() {
 
-	// instantiating Gorilla/mux router
-	r := mux.NewRouter()
+	UseDatabase()
 
-	// simply serve static index page on default page
-	r.Handle("/", http.FileServer(http.Dir("./views/")))
+	myRouter := mux.NewRouter()
 
-	// API consist 3 routers
+	myRouter.HandleFunc("/", HomeHandler)
 
-	// /status - call to make sure that API is up and running
-	// /products - retrieve a list of products that user can leave feedback on
-	// /products/{slug}/feedback - capture user feedback on products
+	myRouter.HandleFunc("/login", LoginHandler).Methods("POST")
+	myRouter.HandleFunc("/signup", SignupHandler).Methods("POST")
 
-	r.Handle("/status", NotImplemented).Methods("GET")
-	r.Handle("/products", NotImplemented).Methods("GET")
-	r.Handle("/product{slug}/feedback", NotImplemented).Methods("POST")
-
-	// setup server for serving static assest from /static/
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
-
-	// App run on port 3000
-	http.ListenAndServe(":3000", r)
+	http.Handle("/", myRouter)
+	http.ListenAndServe(":7000", nil)
 }
 
-// Implementing the NotImplemented handler. Whenever an API endpoint is hit
-// Simply return message "Not Implemented"
+func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
-var NotImplemented = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Not Implemented"))
-})
+	fmt.Fprintln(w, "Hello")
+
+	fmt.Fprintln(w, "SIGN UP OR LOGIN")
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	email, password := r.FormValue("email"), r.FormValue("password")
+
+	// fmt.Printf("Email => [%s]\n", email)
+	// fmt.Printf("Password => [%s]\n", password)
+
+	result := FindUser(email, password)
+
+	if result == 0 {
+		fmt.Fprintln(w, "Email or Password is UNKNOWN")
+	} else {
+		fmt.Fprintln(w, "Welcome back ", email)
+	}
+
+}
+
+func SignupHandler(w http.ResponseWriter, r *http.Request) {
+
+	r.ParseForm()
+
+	email, password := r.FormValue("email"), r.FormValue("password")
+
+	// fmt.Printf("Email => [%s]\n", email)
+	// fmt.Printf("Password => [%s]\n", password)
+
+	AddUser(email, password)
+
+	fmt.Fprintln(w, "ENJOY !")
+}
+
+func AddUser(email, password string) {
+
+	QueryStmt := `
+	INSERT INTO "Users"(email, password) 
+	VALUES($1,$2)`
+
+	_, err := db.Exec(QueryStmt, email, password)
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func FindUser(email, password string) int64 {
+
+	QueryStmt := `
+	SELECT * FROM "Users"
+	WHERE email=$1 AND password=$2
+	`
+
+	result, err := db.Exec(QueryStmt, email, password)
+
+	if err != nil {
+		panic(err)
+	}
+
+	rows, err := result.RowsAffected()
+
+	if err != nil {
+		panic(err)
+	}
+
+	return rows
+}
+
+func UseDatabase() {
+	var err error
+	conStr := "user=postgres password='123456' dbname=server_api sslmode=disable"
+	db, err = sql.Open("postgres", conStr)
+
+	err = db.Ping()
+
+	if err != nil {
+		log.Fatal("Error: Could not establish connection with the database")
+	}
+
+	fmt.Println("Connected to database")
+
+}
