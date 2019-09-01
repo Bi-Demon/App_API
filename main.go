@@ -13,6 +13,7 @@ import (
 
 var db *sql.DB
 
+//Users have informations [email] & [password] for storing to database
 type Users struct {
 	email    string
 	password string
@@ -29,10 +30,10 @@ func main() {
 	myRouter.HandleFunc("/login", LoginHandler).Methods("POST")
 	myRouter.HandleFunc("/signup", SignupHandler).Methods("POST")
 
-	http.Handle("/", myRouter)
-	http.ListenAndServe(":7000", nil)
+	log.Fatal(http.ListenAndServe(":7000", myRouter))
 }
 
+// HomeHandler link to home page API
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintln(w, "Hello")
@@ -40,6 +41,8 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "SIGN UP OR LOGIN")
 }
 
+/*LoginHandler get user's information for Logging in
+return result user existed or not */
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
@@ -58,6 +61,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// SignupHandler get user's information for Signing up to API
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
@@ -72,6 +76,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "ENJOY !")
 }
 
+// AddUser make a SQL's Query  to add user's information to database
 func AddUser(email, password string) {
 
 	QueryStmt := `
@@ -85,6 +90,7 @@ func AddUser(email, password string) {
 	}
 }
 
+// FindUser use database to find if user's information exsit or not
 func FindUser(email, password string) int64 {
 
 	QueryStmt := `
@@ -107,6 +113,7 @@ func FindUser(email, password string) int64 {
 	return rows
 }
 
+// UseDatabase open connection to PostgreSQL
 func UseDatabase() {
 	var err error
 	conStr := "user=postgres password='123456' dbname=server_api sslmode=disable"
