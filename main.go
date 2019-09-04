@@ -13,8 +13,8 @@ import (
 
 var db *sql.DB
 
-//Users have informations [email] & [password] for storing to database
-type Users struct {
+//Credentials have informations [email] & [password] for storing to database
+type Credentials struct {
 	email    string
 	password string
 }
@@ -22,16 +22,19 @@ type Users struct {
 func main() {
 
 	UseDatabase()
+	// initEvents()
 
-	myRouter := mux.NewRouter()
+	myRouter := mux.NewRouter().StrictSlash(true)
 
-	myRouter.HandleFunc("/", HomeHandler)
+	myRouter.HandleFunc("/", HomeHandler).Methods("GET")
 
 	myRouter.HandleFunc("/login", LoginHandler).Methods("POST")
 	myRouter.HandleFunc("/signup", SignupHandler).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":7000", myRouter))
 }
+
+//----------------------------------------------------------------------
 
 // HomeHandler link to home page API
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,17 +49,18 @@ return result user existed or not */
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
-	email, password := r.FormValue("email"), r.FormValue("password")
+	var users Credentials
+	users.email, users.password = r.FormValue("email"), r.FormValue("password")
 
 	// fmt.Printf("Email => [%s]\n", email)
 	// fmt.Printf("Password => [%s]\n", password)
 
-	result := FindUser(email, password)
+	result := FindUser(users.email, users.password)
 
 	if result == 0 {
-		fmt.Fprintln(w, "Email or Password is UNKNOWN")
-	} else {
-		fmt.Fprintln(w, "Welcome back ", email)
+		w.WriteHeader(http.StatusUnauthorized)
+
+		return
 	}
 
 }
@@ -66,21 +70,28 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
 
-	email, password := r.FormValue("email"), r.FormValue("password")
+	var newUsers Credentials
+	newUsers.email, newUsers.password = r.FormValue("email"), r.FormValue("password")
 
 	// fmt.Printf("Email => [%s]\n", email)
 	// fmt.Printf("Password => [%s]\n", password)
 
-	AddUser(email, password)
+	result := ExistUser(newUsers.email)
 
-	fmt.Fprintln(w, "ENJOY !")
+	if result == 1 {
+		w.WriteHeader(http.StatusBadRequest)
+
+		return
+	}
+
+	AddUser(newUsers.email, newUsers.password)
 }
 
 // AddUser make a SQL's Query  to add user's information to database
 func AddUser(email, password string) {
 
 	QueryStmt := `
-	INSERT INTO "Users"(email, password) 
+	INSERT INTO users(email, password) 
 	VALUES($1,$2)`
 
 	_, err := db.Exec(QueryStmt, email, password)
@@ -88,17 +99,41 @@ func AddUser(email, password string) {
 	if err != nil {
 		panic(err)
 	}
+
 }
 
 // FindUser use database to find if user's information exsit or not
 func FindUser(email, password string) int64 {
 
 	QueryStmt := `
-	SELECT * FROM "Users"
+	SELECT * FROM users
 	WHERE email=$1 AND password=$2
 	`
 
 	result, err := db.Exec(QueryStmt, email, password)
+
+	if err != nil {
+		panic(err)
+	}
+
+	rows, err := result.RowsAffected()
+
+	if err != nil {
+		panic(err)
+	}
+
+	return rows
+}
+
+//ExistUser check in if email Registered
+func ExistUser(email string) int64 {
+
+	QueryStmt := `
+	SELECT * FROM users
+	WHERE email=$1
+	`
+
+	result, err := db.Exec(QueryStmt, email)
 
 	if err != nil {
 		panic(err)
