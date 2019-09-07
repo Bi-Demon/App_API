@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +18,12 @@ var db *sql.DB
 type Credentials struct {
 	email    string
 	password string
+}
+
+//users for login API
+type users struct {
+	Email    string
+	Password string
 }
 
 func main() {
@@ -49,19 +56,33 @@ return result user existed or not */
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
-	var users Credentials
-	users.email, users.password = r.FormValue("email"), r.FormValue("password")
+	var Guest Credentials
+	Guest.email, Guest.password = r.FormValue("email"), r.FormValue("password")
 
 	// fmt.Printf("Email => [%s]\n", email)
 	// fmt.Printf("Password => [%s]\n", password)
 
-	result := FindUser(users.email, users.password)
+	result := FindUser(Guest.email, Guest.password)
 
 	if result == 0 {
 		w.WriteHeader(http.StatusUnauthorized)
 
 		return
 	}
+
+	OldUser := users{}
+
+	OldUser.Email = Guest.email
+	OldUser.Password = Guest.password
+
+	Myuser, err := json.Marshal(OldUser)
+	if err != nil {
+		panic(err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(Myuser)
 
 }
 
